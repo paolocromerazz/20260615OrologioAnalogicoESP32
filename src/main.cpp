@@ -17,8 +17,9 @@ SCL → GPIO 22 dell'ESP32.
 */
 
 // Configurazione LED
-#define LED_PIN        13
-#define NUM_LEDS       60
+#define LED_PIN 13
+#define NUM_LEDS 60
+#define LED_OFFSET 30
 Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // Istanza RTC e Web Server
@@ -26,22 +27,26 @@ RTC_DS3231 rtc;
 WebServer server(80);
 
 // --- MODIFICA QUESTE RIGHE CON I DATI DEL TUO ROUTER ---
-const char* ssid = "NOME_DELLA_TUA_RETE_WIFI";
-const char* password = "PASSWORD_DEL_TUO_WIFI";
+// lab
+const char *ssid = "TP-Link_3A26";  //"NOME_DELLA_TUA_RETE_WIFI";
+const char *password = "indovina"; //"PASSWORD_DEL_TUO_WIFI";
+// casa
+//const char *ssid = "Ghiri";  //"NOME_DELLA_TUA_RETE_WIFI";
+//const char *password = "indovina"; //"PASSWORD_DEL_TUO_WIFI";
 
 // Configurazione IP Statico (Richiesto: 192.168.0.9)
-IPAddress ipStatico(192, 168, 0, 9); 
-IPAddress gateway(192, 168, 0, 1);    // Di solito l'IP del router è .1
-IPAddress subnet(255, 255, 255, 0);   // Maschera di sottorete standard
-IPAddress dns1(1, 1, 1, 1);           // DNS primario (Cloudflare)
-IPAddress dns2(8, 8, 8, 8);           // DNS secondario (Google)
+IPAddress ipStatico(192, 168, 1, 9);
+IPAddress gateway(192, 168, 1, 1);  // Di solito l'IP del router è .1
+IPAddress subnet(255, 255, 255, 0); // Maschera di sottorete standard
+IPAddress dns1(1, 1, 1, 1);         // DNS primario (Cloudflare)
+IPAddress dns2(8, 8, 8, 8);         // DNS secondario (Google)
 // ------------------------------------------------------
 
 // Colori personalizzabili (Formato: Rosso, Verde, Blu)
-const uint32_t COLORE_ORE    = strip.Color(255, 0, 0);     // Rosso
-const uint32_t COLORE_MINUTI = strip.Color(0, 0, 255);     // Blu
-const uint32_t COLORE_MARKER = strip.Color(20, 20, 20);     // Bianco tenue
-const uint32_t COLORE_SFONDO = strip.Color(0, 0, 0);       // Spento
+const uint32_t COLORE_ORE = strip.Color(255, 0, 0);     // Rosso
+const uint32_t COLORE_MINUTI = strip.Color(0, 0, 255);  // Blu
+const uint32_t COLORE_MARKER = strip.Color(20, 20, 20); // Bianco tenue
+const uint32_t COLORE_SFONDO = strip.Color(0, 0, 0);    // Spento
 
 // Pagina Web con Script di Sincronizzazione automatica
 const char HTML_PAGINA[] PROGMEM = R"rawliteral(
@@ -92,14 +97,17 @@ const char HTML_PAGINA[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
-void gestisciRoot() {
+void gestisciRoot()
+{
   server.send(200, "text/html", HTML_PAGINA);
 }
 
-void gestisciImpostazioneOra() {
-  if (server.hasArg("y") && server.hasArg("m") && server.hasArg("d") && 
-      server.hasArg("h") && server.hasArg("i") && server.hasArg("s")) {
-    
+void gestisciImpostazioneOra()
+{
+  if (server.hasArg("y") && server.hasArg("m") && server.hasArg("d") &&
+      server.hasArg("h") && server.hasArg("i") && server.hasArg("s"))
+  {
+
     int anno = server.arg("y").toInt();
     int mese = server.arg("m").toInt();
     int giorno = server.arg("d").toInt();
@@ -108,55 +116,67 @@ void gestisciImpostazioneOra() {
     int secondi = server.arg("s").toInt();
 
     rtc.adjust(DateTime(anno, mese, giorno, ore, minuti, secondi));
-    
+
     String risposta = "Ora impostata: " + String(ore) + ":" + String(minuti) + ":" + String(secondi);
     server.send(200, "text/plain", risposta);
-  } else {
+  }
+  else
+  {
     server.send(400, "text/plain", "Parametri mancanti");
   }
 }
 
-void aggiornaQuadrante(int ore, int minuti) {
-  for (int i = 0; i < NUM_LEDS; i++) {
+void aggiornaQuadrante(int ore, int minuti)
+{
+  for (int i = 0; i < NUM_LEDS; i++)
+  {
     strip.setPixelColor(i, COLORE_SFONDO);
   }
 
-  for (int i = 0; i < NUM_LEDS; i += 5) {
+  for (int i = 0; i < NUM_LEDS; i += 5)
+  {
     strip.setPixelColor(i, COLORE_MARKER);
   }
 
-  int ledOre = ((ore % 12) * 5) + (minuti / 12);
-  int ledMinuti = minuti;
+  int ledOre = (((ore + LED_OFFSET)% 12) * 5) + (minuti / 12);
+  int ledMinuti = (minuti + LED_OFFSET) % 60;
+  //Serial.println(ledOre); //visualiza led ore pr debug
 
   strip.setPixelColor(ledMinuti, COLORE_MINUTI);
   strip.setPixelColor(ledOre, COLORE_ORE);
 
-  if (ledOre == ledMinuti) {
+  if (ledOre == ledMinuti)
+  {
     strip.setPixelColor(ledOre, strip.Color(255, 0, 255)); // Viola se sovrapposti
   }
 
   strip.show();
 }
 
-void setup() {
+void setup()
+{
   Serial.begin(9600);
-  
+
   strip.begin();
   strip.setBrightness(50);
   strip.show();
 
-  if (!rtc.begin()) {
+  if (!rtc.begin())
+  {
     Serial.println("Impossibile trovare il modulo RTC!");
-    //while (1); inizialmente non monto rtc
+    while (1)
+      ; // decommentare inizialmente se non monto rtc
   }
 
-  if (rtc.lostPower()) {
+  if (rtc.lostPower())
+  {
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 
   // --- CONFIGURAZIONE RETE LOCALE ---
   // Applica l'IP statico prima di connettersi
-  if (!WiFi.config(ipStatico, gateway, subnet, dns1, dns2)) {
+  if (!WiFi.config(ipStatico, gateway, subnet, dns1, dns2))
+  {
     Serial.println("Errore nella configurazione dell'IP Statico!");
   }
 
@@ -166,14 +186,15 @@ void setup() {
 
   // Attendi la connessione (lampeggio di cortesia sul LED 0)
   int ledStatus = 0;
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(500);
     Serial.print(".");
-    strip.setPixelColor(0, ledStatus ? strip.Color(50, 50, 0) : strip.Color(0,0,0));
+    strip.setPixelColor(0, ledStatus ? strip.Color(50, 50, 0) : strip.Color(0, 0, 0));
     strip.show();
     ledStatus = !ledStatus;
   }
-  
+
   Serial.println("\nWi-Fi Connesso!");
   Serial.print("Indirizzo IP fisso dell'orologio: ");
   Serial.println(WiFi.localIP());
@@ -184,13 +205,15 @@ void setup() {
   server.begin();
 }
 
-void loop() {
+void loop()
+{
   server.handleClient();
 
   static unsigned long ultimoAggiornamento = 0;
-  if (millis() - ultimoAggiornamento >= 1000) {
+  if (millis() - ultimoAggiornamento >= 1000)
+  {
     ultimoAggiornamento = millis();
-    
+
     DateTime oraAttuale = rtc.now();
     aggiornaQuadrante(oraAttuale.hour(), oraAttuale.minute());
   }
